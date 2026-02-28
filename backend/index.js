@@ -11,21 +11,33 @@ const groq = new Groq({
 
 app.use(cors());
 app.use(express.json());
+let conversationHistory = [
+  { role: "system", content: "You are a helpful assistant." }
+];
 
 // Chat route
 app.post("/chat", async (req, res) => {
   const userMessage = req.body.message;
 
+  // Add user message to history
+  conversationHistory.push({
+    role: "user",
+    content: userMessage,
+  });
+
   try {
     const response = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
-      messages: [
-        { role: "system", content: "You are a helpful assistant." },
-        { role: "user", content: userMessage },
-      ],
+      messages: conversationHistory,
     });
 
     const aiReply = response.choices[0].message.content;
+
+    // Add AI reply to history
+    conversationHistory.push({
+      role: "assistant",
+      content: aiReply,
+    });
 
     res.json({ reply: aiReply });
 
