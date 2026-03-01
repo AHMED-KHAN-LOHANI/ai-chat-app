@@ -46,8 +46,15 @@ app.post("/chat", async (req, res) => {
     res.status(500).json({ reply: "Error generating AI response" });
   }
 });
+app.post("/reset", (req, res) => {
+  conversationHistory = [
+    { role: "system", content: "You are a helpful assistant." }
+  ];
 
-const PORT = 5000;
+  res.json({ message: "Conversation reset successfully" });
+});
+
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

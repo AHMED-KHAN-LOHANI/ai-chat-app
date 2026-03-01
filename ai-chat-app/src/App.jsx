@@ -58,18 +58,40 @@ function App() {
         }}
       >
         {/* Header */}
-        <h2
-          style={{
-            padding: "15px",
-            borderBottom: "1px solid #333",
-            margin: 0,
-            flexShrink: 0,   // ✅ prevent header from shrinking
-          }}
-        >
-          AI Chat App
-        </h2>
+        
 
         {/* Chat Area */}
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "15px",
+    borderBottom: "1px solid #333",
+    flexShrink: 0,
+  }}
+>
+  <h2 style={{ margin: 0 }}>AI Chat App</h2>
+
+  <button
+    onClick={async () => {
+      await fetch("http://localhost:5000/reset", {
+        method: "POST",
+      });
+      setChat([]);
+    }}
+    style={{
+      padding: "6px 12px",
+      borderRadius: "6px",
+      border: "none",
+      backgroundColor: "#ff4d4d",
+      color: "white",
+      cursor: "pointer",
+    }}
+  >
+    Clear Chat
+  </button>
+</div>
         <div
           style={{
             flex: 1,
