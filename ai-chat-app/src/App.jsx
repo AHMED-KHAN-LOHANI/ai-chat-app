@@ -20,12 +20,14 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-
+     const response = await fetch(
+  "https://ai-chat-app-ba6r.onrender.com/chat",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  }
+); 
       const data = await response.json();
       setChat((prev) => [...prev, { text: data.reply, sender: "ai" }]);
     } catch (error) {
@@ -75,7 +77,7 @@ function App() {
 
   <button
     onClick={async () => {
-      await fetch("http://localhost:5000/reset", {
+      await fetch("https://ai-chat-app-ba6r.onrender.com/reset", {
         method: "POST",
       });
       setChat([]);
