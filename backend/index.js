@@ -1,4 +1,6 @@
-require("dotenv").config();
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 const Groq = require("groq-sdk");
 const express = require("express");
 const cors = require("cors");
@@ -9,7 +11,10 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"],
+}));
 app.use(express.json());
 let conversationHistory = [
   { role: "system", content: "You are a helpful assistant." }
@@ -57,5 +62,5 @@ app.post("/reset", (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on ${PORT}`);
 });
