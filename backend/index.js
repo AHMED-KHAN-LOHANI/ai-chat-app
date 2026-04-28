@@ -1,11 +1,19 @@
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
+
+const mongoose = require("mongoose");
 const Groq = require("groq-sdk");
 const express = require("express");
 const cors = require("cors");
+const authRoutes = require("./routes/auth");
 
 const app = express();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log("MongoDB connected ✅"))
+  .catch((err) => console.log("MongoDB error:", err));
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -16,6 +24,10 @@ app.use(cors({
   methods: ["GET", "POST"],
 }));
 app.use(express.json());
+
+// Auth routes
+app.use("/auth", authRoutes);
+
 let conversationHistory = [
   { role: "system", content: "You are a helpful assistant." }
 ];
@@ -24,7 +36,10 @@ let conversationHistory = [
 app.post("/chat", async (req, res) => {
   const userMessage = req.body.message;
 
-  // Add user message to history
+  if (!userMessage || userMessage.trim() === "") {
+    return res.status(400).json({ reply: "Message cannot be empty" });
+  }
+
   conversationHistory.push({
     role: "user",
     content: userMessage,
@@ -38,7 +53,6 @@ app.post("/chat", async (req, res) => {
 
     const aiReply = response.choices[0].message.content;
 
-    // Add AI reply to history
     conversationHistory.push({
       role: "assistant",
       content: aiReply,
@@ -51,11 +65,12 @@ app.post("/chat", async (req, res) => {
     res.status(500).json({ reply: "Error generating AI response" });
   }
 });
+
+// Reset route
 app.post("/reset", (req, res) => {
   conversationHistory = [
     { role: "system", content: "You are a helpful assistant." }
   ];
-
   res.json({ message: "Conversation reset successfully" });
 });
 
