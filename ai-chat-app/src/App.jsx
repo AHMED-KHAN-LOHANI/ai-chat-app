@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Auth from "./Auth";
+import Sidebar from "./Sidebar";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -24,6 +25,13 @@ function App() {
     localStorage.removeItem("email");
     setToken(null);
     setEmail(null);
+    setChat([]);
+  };
+
+  const handleNewChat = async () => {
+    await fetch("https://ai-chat-app-ba6r.onrender.com/reset", {
+      method: "POST",
+    });
     setChat([]);
   };
 
@@ -70,14 +78,17 @@ function App() {
     <div style={{
       height: "100vh",
       display: "flex",
-      justifyContent: "center",
       backgroundColor: "#212121",
       color: "white",
       fontFamily: "Arial, sans-serif",
     }}>
+
+      {/* Sidebar */}
+      <Sidebar onNewChat={handleNewChat} />
+
+      {/* Main Chat Area */}
       <div style={{
-        width: "100%",
-        maxWidth: "900px",
+        flex: 1,
         display: "flex",
         flexDirection: "column",
       }}>
@@ -87,33 +98,20 @@ function App() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "15px",
+          padding: "15px 20px",
           borderBottom: "1px solid #333",
           flexShrink: 0,
         }}>
-          <h2 style={{ margin: 0 }}>AI Chat App</h2>
+          <h2 style={{ margin: 0, fontSize: "18px" }}>New Chat</h2>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <span style={{ fontSize: "14px", color: "#aaa" }}>{email}</span>
-
-            <button
-              onClick={async () => {
-                await fetch("https://ai-chat-app-ba6r.onrender.com/reset", {
-                  method: "POST",
-                });
-                setChat([]);
-              }}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: "#ff4d4d",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Clear
-            </button>
+          <div style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+          }}>
+            <span style={{ fontSize: "13px", color: "#aaa" }}>
+              {email}
+            </span>
 
             <button
               onClick={handleLogout}
@@ -124,6 +122,7 @@ function App() {
                 backgroundColor: "#555",
                 color: "white",
                 cursor: "pointer",
+                fontSize: "13px",
               }}
             >
               Logout
@@ -140,6 +139,18 @@ function App() {
           display: "flex",
           flexDirection: "column",
         }}>
+
+          {chat.length === 0 && (
+            <div style={{
+              textAlign: "center",
+              color: "#555",
+              marginTop: "100px",
+              fontSize: "16px",
+            }}>
+              Start a conversation...
+            </div>
+          )}
+
           {chat.map((msg, index) => (
             <div
               key={index}
@@ -151,6 +162,7 @@ function App() {
                 marginBottom: "10px",
                 maxWidth: "75%",
                 wordWrap: "break-word",
+                lineHeight: "1.5",
               }}
             >
               {msg.text}
@@ -164,6 +176,7 @@ function App() {
               padding: "10px 15px",
               borderRadius: "15px",
               marginBottom: "10px",
+              color: "#aaa",
             }}>
               AI is thinking...
             </div>
@@ -175,7 +188,7 @@ function App() {
         {/* Input Section */}
         <div style={{
           display: "flex",
-          padding: "15px",
+          padding: "15px 20px",
           borderTop: "1px solid #333",
           gap: "10px",
           flexShrink: 0,
@@ -196,6 +209,7 @@ function App() {
               outline: "none",
               backgroundColor: "#2f2f2f",
               color: "white",
+              fontSize: "14px",
             }}
           />
 
@@ -208,6 +222,7 @@ function App() {
               backgroundColor: "#007bff",
               color: "white",
               cursor: "pointer",
+              fontSize: "14px",
             }}
           >
             Send
