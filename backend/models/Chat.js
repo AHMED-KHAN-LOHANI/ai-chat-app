@@ -6,17 +6,14 @@ const chatSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  sessionId: {
+    type: String,
+    required: true,
+  },
   messages: [
     {
-      role: {
-        type: String,
-        enum: ["user", "assistant"],
-        required: true,
-      },
-      content: {
-        type: String,
-        required: true,
-      },
+      role: { type: String, enum: ["user", "assistant"], required: true },
+      content: { type: String, required: true },
     },
   ],
 }, { timestamps: true });

@@ -11,34 +11,29 @@ const authRoutes = require("./routes/auth");
 
 const app = express();
 
-// Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected ✅"))
   .catch((err) => console.log("MongoDB error:", err));
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST"],
-}));
+app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
 app.use(express.json());
-
-// Auth routes
 app.use("/auth", authRoutes);
 
-let conversationHistory = [
-  { role: "system", content: "You are a helpful assistant." }
-];
+// Per-user memory: userId -> { sessionId, messages[] }
+const userSessions = new Map();
+
+function getSystemPrompt() {
+  return [{ role: "system", content: "You are a helpful assistant." }];
+}
 
 // Chat route
 app.post("/chat", async (req, res) => {
-  const userMessage = req.body.message;
+  const { message, sessionId } = req.body;
   const authHeader = req.headers.authorization;
 
-  if (!userMessage || userMessage.trim() === "") {
+  if (!message || message.trim() === "") {
     return res.status(400).json({ reply: "Message cannot be empty" });
   }
 
@@ -53,31 +48,44 @@ app.post("/chat", async (req, res) => {
     }
   }
 
-  conversationHistory.push({
-    role: "user",
-    content: userMessage,
-  });
+  // Get or create session for this user
+  if (!userSessions.has(userId)) {
+    userSessions.set(userId, {
+      sessionId: sessionId || Date.now().toString(),
+      messages: getSystemPrompt(),
+    });
+  }
+
+  const session = userSessions.get(userId);
+
+  // If frontend sends a different sessionId, it's a new chat
+  if (sessionId && sessionId !== session.sessionId) {
+    userSessions.set(userId, {
+      sessionId,
+      messages: getSystemPrompt(),
+    });
+  }
+
+  const currentSession = userSessions.get(userId);
+  currentSession.messages.push({ role: "user", content: message });
 
   try {
     const response = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
-      messages: conversationHistory,
+      messages: currentSession.messages,
     });
 
     const aiReply = response.choices[0].message.content;
+    currentSession.messages.push({ role: "assistant", content: aiReply });
 
-    conversationHistory.push({
-      role: "assistant",
-      content: aiReply,
-    });
-
+    // Save to MongoDB
     if (userId) {
       try {
-        let chat = await Chat.findOne({ userId });
+        let chat = await Chat.findOne({ userId, sessionId: currentSession.sessionId });
         if (!chat) {
-          chat = new Chat({ userId, messages: [] });
+          chat = new Chat({ userId, sessionId: currentSession.sessionId, messages: [] });
         }
-        chat.messages.push({ role: "user", content: userMessage });
+        chat.messages.push({ role: "user", content: message });
         chat.messages.push({ role: "assistant", content: aiReply });
         await chat.save();
       } catch (dbErr) {
@@ -85,7 +93,7 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    res.json({ reply: aiReply });
+    res.json({ reply: aiReply, sessionId: currentSession.sessionId });
 
   } catch (error) {
     console.error("Groq error:", error);
@@ -93,16 +101,29 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// Reset route
+// Reset — creates new session for this user
 app.post("/reset", (req, res) => {
-  conversationHistory = [
-    { role: "system", content: "You are a helpful assistant." }
-  ];
-  res.json({ message: "Conversation reset successfully" });
+  const authHeader = req.headers.authorization;
+  let userId = "guest";
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      userId = decoded.userId;
+    } catch (err) {}
+  }
+
+  const newSessionId = Date.now().toString();
+  userSessions.set(userId, {
+    sessionId: newSessionId,
+    messages: getSystemPrompt(),
+  });
+
+  res.json({ message: "New session started", sessionId: newSessionId });
 });
 
-const PORT = process.env.PORT || 5000;
-// Get chat history for logged-in user
+// Get all sessions for logged-in user
 app.get("/history", async (req, res) => {
   const authHeader = req.headers.authorization;
 
@@ -113,15 +134,58 @@ app.get("/history", async (req, res) => {
   try {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const chat = await Chat.findOne({ userId: decoded.userId });
 
-    if (!chat) return res.json({ messages: [] });
+    const chats = await Chat.find({ userId: decoded.userId }).sort({ createdAt: -1 });
 
-    res.json({ messages: chat.messages });
+    // Return sessions with first user message as title
+    const sessions = chats.map((chat) => {
+      const firstUserMsg = chat.messages.find((m) => m.role === "user");
+      return {
+        sessionId: chat.sessionId,
+        title: firstUserMsg ? firstUserMsg.content.slice(0, 40) : "New Chat",
+        messages: chat.messages,
+      };
+    });
+
+    res.json({ sessions });
   } catch (err) {
     res.status(401).json({ message: "Invalid token" });
   }
 });
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+
+// Load a specific session
+app.get("/session/:sessionId", async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const chat = await Chat.findOne({
+      userId: decoded.userId,
+      sessionId: req.params.sessionId,
+    });
+
+    if (!chat) return res.status(404).json({ message: "Session not found" });
+
+    // Load into memory so AI continues from this context
+    userSessions.set(decoded.userId, {
+      sessionId: chat.sessionId,
+      messages: [
+        getSystemPrompt()[0],
+        ...chat.messages,
+      ],
+    });
+
+    res.json({ messages: chat.messages, sessionId: chat.sessionId });
+  } catch (err) {
+    res.status(401).json({ message: "Invalid token" });
+  }
 });
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
