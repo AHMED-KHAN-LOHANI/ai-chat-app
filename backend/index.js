@@ -102,7 +102,26 @@ app.post("/reset", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+// Get chat history for logged-in user
+app.get("/history", async (req, res) => {
+  const authHeader = req.headers.authorization;
 
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const chat = await Chat.findOne({ userId: decoded.userId });
+
+    if (!chat) return res.json({ messages: [] });
+
+    res.json({ messages: chat.messages });
+  } catch (err) {
+    res.status(401).json({ message: "Invalid token" });
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
 });

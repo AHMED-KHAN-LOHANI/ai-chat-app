@@ -9,11 +9,50 @@ function App() {
   const [chat, setChat] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  //  Load chatHistory from localStorage on mount
+  const [chatHistory, setChatHistory] = useState(() => {
+    return JSON.parse(localStorage.getItem("chatHistory") || "[]");
+  });
+
   const chatEndRef = useRef(null);
 
+  // Auto-scroll to bottom when chat updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
+
+  //  Save chatHistory to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
+  }, [chatHistory]);
+
+  // Fetch Chat History from Backend (merge with localStorage)
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!token) return;
+
+      try {
+        const response = await fetch("https://ai-chat-app-ba6r.onrender.com/history", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.messages && data.messages.length > 0) {
+            setChatHistory(data.messages);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load history:", error);
+      }
+    };
+
+    fetchHistory();
+  }, [token]);
 
   const handleLogin = (newToken, userEmail) => {
     setToken(newToken);
@@ -23,11 +62,14 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("email");
+    localStorage.removeItem("chatHistory"); //  Clear persisted history on logout
     setToken(null);
     setEmail(null);
     setChat([]);
+    setChatHistory([]);
   };
 
+  //  Only clears current chat — history stays in sidebar
   const handleNewChat = async () => {
     await fetch("https://ai-chat-app-ba6r.onrender.com/reset", {
       method: "POST",
@@ -59,7 +101,12 @@ function App() {
       if (!response.ok) throw new Error("Server error");
 
       const data = await response.json();
-      setChat((prev) => [...prev, { text: data.reply, sender: "ai" }]);
+      const aiMessage = { text: data.reply, sender: "ai" };
+
+      setChat((prev) => [...prev, aiMessage]);
+
+      // Add both messages to chatHistory so sidebar updates in real-time
+      setChatHistory((prev) => [...prev, userMessage, aiMessage]);
     } catch (error) {
       setChat((prev) => [
         ...prev,
@@ -83,10 +130,11 @@ function App() {
       fontFamily: "Arial, sans-serif",
     }}>
 
-      {/* Sidebar */}
-      <Sidebar onNewChat={handleNewChat} />
+      <Sidebar
+        onNewChat={handleNewChat}
+        chatHistory={chatHistory}
+      />
 
-      {/* Main Chat Area */}
       <div style={{
         flex: 1,
         display: "flex",
