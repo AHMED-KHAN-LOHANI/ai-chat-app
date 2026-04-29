@@ -1,7 +1,8 @@
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
-
+const Chat = require("./models/Chat");
+const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const Groq = require("groq-sdk");
 const express = require("express");
@@ -35,9 +36,21 @@ let conversationHistory = [
 // Chat route
 app.post("/chat", async (req, res) => {
   const userMessage = req.body.message;
+  const authHeader = req.headers.authorization;
 
   if (!userMessage || userMessage.trim() === "") {
     return res.status(400).json({ reply: "Message cannot be empty" });
+  }
+
+  let userId = null;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      userId = decoded.userId;
+    } catch (err) {
+      console.log("Invalid token");
+    }
   }
 
   conversationHistory.push({
@@ -57,6 +70,20 @@ app.post("/chat", async (req, res) => {
       role: "assistant",
       content: aiReply,
     });
+
+    if (userId) {
+      try {
+        let chat = await Chat.findOne({ userId });
+        if (!chat) {
+          chat = new Chat({ userId, messages: [] });
+        }
+        chat.messages.push({ role: "user", content: userMessage });
+        chat.messages.push({ role: "assistant", content: aiReply });
+        await chat.save();
+      } catch (dbErr) {
+        console.log("DB save error:", dbErr);
+      }
+    }
 
     res.json({ reply: aiReply });
 
