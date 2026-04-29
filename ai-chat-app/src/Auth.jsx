@@ -13,6 +13,17 @@ function Auth({ onLogin }) {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setMessage("Please enter a valid email address");
+      return;
+    }
+
+    if (password.length < 6) {
+      setMessage("Password must be at least 6 characters");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
@@ -67,47 +78,66 @@ function Auth({ onLogin }) {
         borderRadius: "12px",
         width: "100%",
         maxWidth: "400px",
+        boxShadow: "0 0 30px rgba(0,0,0,0.5)",
       }}>
-        <h2 style={{ marginBottom: "20px", textAlign: "center" }}>
-          {isLogin ? "Login" : "Register"}
+        <h2 style={{ marginBottom: "8px", textAlign: "center" }}>
+          {isLogin ? "Welcome Back" : "Create Account"}
         </h2>
+
+        <p style={{
+          textAlign: "center",
+          color: "#aaa",
+          marginBottom: "24px",
+          fontSize: "14px"
+        }}>
+          {isLogin ? "Login to continue chatting" : "Register to get started"}
+        </p>
 
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
           style={{
             width: "100%",
             padding: "12px",
             marginBottom: "12px",
             borderRadius: "8px",
-            border: "none",
+            border: "1px solid #444",
             backgroundColor: "#1e1e1e",
             color: "white",
             boxSizing: "border-box",
+            fontSize: "14px",
           }}
         />
 
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password (min 6 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
           style={{
             width: "100%",
             padding: "12px",
-            marginBottom: "12px",
+            marginBottom: "16px",
             borderRadius: "8px",
-            border: "none",
+            border: "1px solid #444",
             backgroundColor: "#1e1e1e",
             color: "white",
             boxSizing: "border-box",
+            fontSize: "14px",
           }}
         />
 
         {message && (
-          <p style={{ color: "#ff4d4d", marginBottom: "10px" }}>
+          <p style={{
+            color: message.includes("created") ? "#4CAF50" : "#ff4d4d",
+            marginBottom: "12px",
+            fontSize: "14px",
+            textAlign: "center",
+          }}>
             {message}
           </p>
         )}
@@ -120,24 +150,30 @@ function Auth({ onLogin }) {
             padding: "12px",
             borderRadius: "8px",
             border: "none",
-            backgroundColor: "#007bff",
+            backgroundColor: loading ? "#555" : "#007bff",
             color: "white",
-            cursor: "pointer",
-            marginBottom: "12px",
+            cursor: loading ? "not-allowed" : "pointer",
+            marginBottom: "16px",
+            fontSize: "15px",
+            fontWeight: "bold",
           }}
         >
           {loading ? "Please wait..." : isLogin ? "Login" : "Register"}
         </button>
 
         <p
-          onClick={() => setIsLogin(!isLogin)}
+          onClick={() => {
+            setIsLogin(!isLogin);
+            setMessage("");
+          }}
           style={{
             textAlign: "center",
             cursor: "pointer",
             color: "#007bff",
+            fontSize: "14px",
           }}
         >
-          {isLogin ? "No account? Register" : "Have account? Login"}
+          {isLogin ? "No account? Register here" : "Already have account? Login"}
         </p>
       </div>
     </div>
